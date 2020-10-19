@@ -11,6 +11,24 @@ with open(labeledListFileName) as labeledListFile:
 
 读入类型为字符串，经过splitlines()后得到 list列表
 
+
+
+另外一种玩法：
+
+```python
+def loadDataSet(filename):
+    dataMat=[]
+    label=[]
+    f = open(filename)
+    for line in f.readlines():
+        lineArr= line.strip().split('\t')
+        dataMat.append([float(lineArr[0]),float(lineArr[1])])
+        label.append(float(lineArr[2]))
+    return dataMat,label
+```
+
+
+
 ### 二、笛卡尔积
 
 ```python
@@ -29,7 +47,11 @@ tempLabeledList = [ element for element in labeledList if element[0] == currentT
 
 
 
-### 四、
+### 四、随机函数
+
+```python
+rand_i=int(random.uniform(0,m))
+```
 
 
 
@@ -93,7 +115,7 @@ tempMatrix = entityLinearizeFun(tempMatrix, regressResult[0], regressResult[1])
 
 
 
-#### 矩阵乘法 np.dot(),如果如果是用* np.multiply() 的话就是对应元素相乘（点乘）：
+#### 对于mat矩阵：矩阵乘法 np.dot(),如果如果是用* np.multiply() 的话就是对应元素相乘（点乘）：
 
 ```
 e=np.array([[1,2,3,4,5],[1,2,3,4,5]])
@@ -161,7 +183,7 @@ https://blog.csdn.net/weixin_44898235/article/details/100730721
 
 ### np.nonzero(a)
 
-返回数组a中非零元素的索引值数组。a4 (array([1, 2], dtype=int64),) 这块是列表组成的数组，需要reshape才可以使用，或者取[0]
+返回数组a中非零元素的索引值数组。a4 (array([1, 2], dtype=int64),) 这块是列表组成的数组，**需要reshape才可以使用，或者取[0]**
 
 ```python
     validEcacheList = np.nonzero(oS.eCache[:,0].A)[0]       
@@ -174,7 +196,7 @@ https://blog.csdn.net/weixin_44898235/article/details/100730721
 
 
 
-### 浅拷贝与深拷贝
+### 浅拷贝与深拷贝  (修改mat矩阵需要保存旧值的时候需要使用.copy（)
 
 ```
 a=np.mat([[1,2,3],[5,6,7]])
@@ -204,6 +226,12 @@ index和columns传入list列表
 从dataframe中取出value  加.value() ,然后 .ravel() 得到 numpy数组
 
 
+
+### 三、删除列
+
+```
+raw_gps_frame.drop(['Unnamed: 4'], axis=1, inplace=True)
+```
 
 
 
