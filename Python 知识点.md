@@ -253,3 +253,8 @@ regressResult = stats.linregress(labeledFeatureDiffArray, labeledAQIDiffArray)
 | :---------- | :----------------------------------------------------------- |
 | Returns:    | **slope** : floatslope of the regression line**intercept** : floatintercept of the regression line**r-value** : floatcorrelation coefficient**p-value** : floattwo-sided p-value for a hypothesis test whose null hypothesis is that the slope is zero.**stderr** : floatStandard error of the estimate |
 
+
+
+
+
+### XML
