@@ -258,3 +258,101 @@ regressResult = stats.linregress(labeledFeatureDiffArray, labeledAQIDiffArray)
 
 
 ### XML
+
+使用的时候主要注意看一下doc.createElement这个方法，网上没有比较具体的实现。
+
+```python
+import time
+import xml.dom.minidom
+
+from xml.dom.minidom import parse
+intersection_taian=r'./data/book.xml'
+DOMTree=parse(intersection_taian)
+book_list=DOMTree.documentElement
+print("book_list type:",book_list)
+print("book_list[0]",book_list)
+a=book_list.toxml()
+print(type(a))
+print(a)
+b=book_list.lastChild
+print(b)
+print("typeb :",type(b))
+c=book_list.firstChild
+print(c)
+d=book_list.getElementsByTagName('book')
+print("d:",d)
+print("d_type:",type(d))
+print("d_length:",len(d))
+print("d[1]:",d[1])
+print("d[1].toxml:",d[1].toxml())
+print("d[1].type:",type(d[1]))
+
+e=book_list.getElementsByTagName('title')
+print("e[1].toxml:",e[0].toxml())
+print("e:",e)
+print("e_type",type(e))
+print("e_length:",len(e))
+print("e[0] type:",type(e[0]))
+
+if book_list.hasAttribute('type'):
+    print("booklist has the type attribute")
+
+else:
+    print("booklist doesnt have the type attribute")
+
+if book_list.getElementsByTagName('book')[0].hasAttribute('category'):
+#if book_list.getElementsByTagName('book').hasAttribute('category'):
+    print("booklist has the category attribute")
+
+else:
+    print("booklist doesnt have the category attribute")
+
+
+book1=d[0]
+print("book1:",book1)
+title_list=book1.getElementsByTagName('author')
+print("title_list,type：",type(title_list))
+print("title_list:",title_list[0])
+#xml=getElementsByTagName(intersection_taian)
+
+books=book_list.getElementsByTagName('book')
+f=books[0].childNodes
+print("f:",f)
+print("f_type:",f)
+
+print("book_list and some info:",book_list.nodeName,book_list.nodeValue,book_list.nodeType)
+doc=xml.dom.minidom.Document()
+newelem = doc.createElement('edition')
+newelem1 = doc.createElement('funk')
+newtext=doc.createTextNode('First')
+newtext1=doc.createTextNode('second')
+newelem.appendChild(newtext)
+newelem1.appendChild(newtext1)
+newelem1.setAttribute("haha","its you")
+book_list.appendChild(newelem)
+newelem.appendChild(newelem1)
+edition=book_list.getElementsByTagName("edition")
+print(edition[0])
+book_list.removeChild(edition[0])
+print("book list new:",book_list.toxml())
+
+
+
+for book in books:
+    print("*********************************book****************************")
+    if book.hasAttribute("category"):
+        print("book has category")
+    title=book.getElementsByTagName("title")[0]
+    author=book.getElementsByTagName("author")[0]
+    pagenumber=book.getElementsByTagName("pageNumber")[0]
+
+
+    print("title is ",title.childNodes[0].data)
+    print("getAttribute:",book.getAttribute("category"))
+    book.setAttribute("haha","it's me")
+    print(book.toxml())
+
+
+
+
+```
