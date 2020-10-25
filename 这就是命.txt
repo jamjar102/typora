@@ -1,0 +1,148 @@
+ 
+def change_dict():
+    with open('./data/tmp.dat', "rb") as f:
+        raw_away_list = pickle.load(f)
+
+
+
+    file_path_way = './data/merge_node_way.csv'
+
+    merge_list = way_dict.way_dict(file_path_way)
+
+    file_path2='./data/merge_nodes.csv'
+    roaddict = road_dict.road_dict(file_path2)
+
+    way_really_dict={}  # key way_id  value： way
+    for way in raw_away_list:
+        way_really_dict[way.id]=way
+
+    index=0
+    new_way=[]
+    new_node=[]  #由于卡口的映射到raw way上,将raw way进行分段,分成有卡口的路段和没有卡口的路段.需要加一个node来分开,这个node不在师兄给的centernode里面,需要记下来.
+               #todo 上面说的不对,这块不用传,不在centernode里面的自动生成即可
+
+    print(len(merge_list))
+    fuck = 0
+    suck=0
+    debug=0
+    for wd in merge_list:
+        a = []
+        flag=False
+        values=wd[1]
+        if "-122869" in wd[1]:
+            print("debug!!!!!")
+            debug=1
+            print(debug)
+        for i in range(len(values)):
+
+            if way_really_dict[values[i]].hascarema==True:
+                flag=True
+                index=i
+
+
+
+        new_dict=[]
+        if(flag==True):
+            fuck+=1
+
+            value1=values[:index]
+            value2=values[index]
+            value3=values[index+1:]
+
+            node_2_1=way_really_dict[value2].ref[0]
+            node_2_2=way_really_dict[value2].ref[-1]
+
+            new_dict.append([[node_2_1,node_2_2],[value2]])
+            new_node.extend([node_2_1,node_2_2])
+            #todo value2
+
+            if debug==1:
+                print("debug len(value1) " ,len(value1),value1)
+            tmp_dict=[]
+            if (len(value1)!=0):
+                if(len(value1)==3):
+                    print("dubug")
+                for v in value1:
+                    node1=way_really_dict[v].ref[0]
+                    node2=way_really_dict[v].ref[-1]
+                    tmp_dict.append(node1)
+                    tmp_dict.append(node2)
+
+                node_1=[]
+                '''   
+                if(len(tmp_dict)==2):
+                    new_dict.append([tmp_dict, value1])
+                '''
+
+
+                for i in range(len(tmp_dict)):
+
+                    count=0
+                    for t in range(len(tmp_dict)):
+                        if tmp_dict[i]==tmp_dict[t]:
+                            count+=1
+                    if count==1:
+                        node_1.append(tmp_dict[i])
+
+                new_dict.append([node_1, value1])
+                new_node.extend(node_1)
+
+
+            tmp_dict = []
+
+            if debug==1:
+                print("debug len(value3) " ,len(value3),value3)
+            if (len(value3) != 0):
+
+                if(len(value3)==3):
+                    print("dubug")
+                for v in value3:
+                    node1 = way_really_dict[v].ref[0]
+                    node2 = way_really_dict[v].ref[-1]
+                    tmp_dict.append(node1)
+                    tmp_dict.append(node2)
+
+
+
+                node_3 = []
+                ''' 
+                if(len(tmp_dict)==2):
+                    new_dict.append([tmp_dict, value3])
+                    continue
+                '''
+                for i in range(len(tmp_dict)):
+
+                    count = 0
+                    for t in range(len(tmp_dict)):
+                        if tmp_dict[i] == tmp_dict[t]:
+                            count += 1
+                    if count == 1:
+                        node_3.append(tmp_dict[i])
+
+                new_dict.append([node_3, value3])
+                new_node.extend(node_3)
+
+
+            a.extend(new_dict)
+            print("a",a)
+            suck+=1
+
+            new_way.extend(new_dict)
+
+        else:
+
+            new_way.append(wd)
+
+
+    print("*****************************************************")
+    print(len(a))
+
+    print(len(new_way))
+    print("old",len(merge_list))
+    print("fuck:",fuck)
+    print("suck:",suck)
+    print(new_node)
+
+    with open('./data/new_merged_way.json', 'w') as file_obj:
+        json.dump(new_way, file_obj)
+
