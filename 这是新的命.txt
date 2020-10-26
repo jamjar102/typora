@@ -1,0 +1,351 @@
+# todo 每次更新需要先生成新的json/pickle文件！
+import json
+import pickle
+
+import road_dict
+import way_dict
+from data_structure import node as node_class
+from data_structure import way as way_class
+
+import transform_gps
+import road_binding
+from math import radians, cos, sin, asin, sqrt
+import pandas as pd
+import cal_distance
+'''
+文件说明：
+    camera_fix_way 将卡口绑定到路上（raw way），获取新的way_list
+    change_dict 获得新的waylist之后，改变聚合短路到长路的映射字典
+
+'''
+
+
+def camera_fix_way():
+
+    with open('./data/raw_node.dat', "rb") as f:
+        node_list = pickle.load(f)
+
+    print("center_node.dat pickle read finished")
+
+    with open('./data/raw_way.dat', "rb") as f:
+        raw_way_list = pickle.load(f)
+
+    print("raw_way.dat pickle read finished")
+
+
+
+    with open('./data/un_camera_node_raw.dat', "rb") as f:   #直接读取 不能绑定到raw node 的卡口camera数据，已经是gps坐标系
+        camera_gps_list = pickle.load(f)
+
+    '''with open('./data/not_camera_node.dat', "rb") as f:   #直接读取 不能绑定到raw node 的卡口camera数据，已经是gps坐标系
+        camera_gps_list = pickle.load(f)'''
+
+    node_gps_map={}    # raw way的raw node对应 的 gps点
+
+    for node in node_list:
+        node_gps_map[node.id]=[node.lat,node.lon]
+
+    count = 0
+    diff_all = 0
+
+    fixed_way_camera=[]
+    not_fixed_way_camera = []
+
+    for i in range(len(camera_gps_list)):  # 遍历寻找在路段上的camera 绑定到路口上
+        flag = False
+        lat1 = camera_gps_list[i].lat
+        lng1 = camera_gps_list[i].lon
+        if (float(lat1) < 10.0 or float(lng1) < 10.0):
+            print("this camera is error!")   #过滤脏数据
+            continue
+
+        min_dis = 120.0   #camera到way的最小距离
+        cloest_way = way_class()  #存最近的cloest_way
+        idx=-1
+        for t in range(len(raw_way_list)):   #遍历路线找距离卡口最近raw way
+            lat1 = camera_gps_list[i].lat
+            lng1 = camera_gps_list[i].lon
+            ref_id=raw_way_list[t].ref
+            node1_lat=node_gps_map[ref_id[0]][0]
+            node1_lng = node_gps_map[ref_id[0]][1]
+            node2_lat=node_gps_map[ref_id[-1]][0]
+            node2_lng = node_gps_map[ref_id[-1]][1]
+
+
+            dis = cal_distance.cal( float(lat1),float(lng1), float(node1_lat), float(node1_lng), float(node2_lat), float(node2_lng))  #计算camera与路段的距离
+            # print(dis)
+
+            if dis < min_dis and raw_way_list[t].hascarema==False:   #如果足够近 并且该路没有绑定卡口
+
+                min_dis=dis
+                cloest_way=raw_way_list[t]
+                flag = True
+                idx=t
+                print("id",camera_gps_list[i].id)    # camera的id
+
+        if flag==True:
+            fixed_way_camera.append(camera_gps_list[i])
+            diff_all += min_dis
+            count += 1
+            raw_way_list[idx].hascarema = True  # 这条路有卡口，标志位true
+            raw_way_list[idx].carema_num = camera_gps_list[i].id  # 这条路有卡口，标志位true
+
+        if flag == False:
+            #print(" dont match i=", i)
+            not_fixed_way_camera.append(camera_gps_list[i])
+
+
+
+    print(count)
+    print("average dis:", diff_all / count)
+    print("all not camera node num:",len(camera_gps_list))
+
+    has_camera_num=[c for c in  raw_way_list if c.hascarema==True]
+    print("has camera fixed raw way num:",len(has_camera_num))
+    print("all raw way num:",len(raw_way_list))
+
+
+
+    road_binding.create_xml(fixed_way_camera, xmlname='./data/fixed_way_camera.xml', is_camera=True)
+    road_binding.create_xml(not_fixed_way_camera, xmlname='./data/not_fixed_way_camera.xml', is_camera=True)
+
+    # 导出看看那些路被绑定了
+    road_binding.create_xml_fullmap(node_list=node_list,way_list=raw_way_list, xmlname='./data/fix_way_test.xml', is_camera=False)
+
+
+
+    with open('./data/raw_way_with_camera.dat', "wb") as f:
+        pickle.dump(raw_way_list, f)
+
+
+def change_dict():
+
+    with open('./data/raw_node.dat', "rb") as f:
+        node_list = pickle.load(f)
+
+
+
+    node_gps_map={}    # raw way的raw node对应 的 gps点
+
+    for node in node_list:
+        node_gps_map[node.id]=[float(node.lat),float(node.lon)]
+
+
+
+    with open('./data/raw_way.dat', "rb") as f:
+        way_list = pickle.load(f)
+
+
+
+    way_map={}    # raw way的raw node对应 的 gps点
+
+    for way in way_list:
+        way_map[way.id]=way
+
+
+
+
+    with open('./data/raw_way_with_camera.dat', "rb") as f:
+        raw_away_list = pickle.load(f)
+
+    file_path_way = './data/merge_node_way.csv'
+
+    merge_list = way_dict.way_dict(file_path_way)
+
+    file_path2 = './data/merge_nodes.csv'
+    roaddict = road_dict.road_dict(file_path2)
+
+    way_really_dict = {}  # key way_id  value： way todo 存储上面检测到camera的路段，做个字典，检测merge way文件中的value，如果检测到，需要拆分value
+    for way in raw_away_list:
+        way_really_dict[way.id] = way
+
+    index = 0
+    new_way_ret = []
+
+    new_node = []  # 由于卡口的映射到raw way上,将raw way进行分段,分成有卡口的路段和没有卡口的路段.需要加一个node来分开,这个node不在师兄给的centernode里面,需要记下来.
+    # todo 上面说的不对,这块不用传,不在centernode里面的自动生成即可
+
+    print(len(merge_list))
+    count_create = 0
+
+
+    new_dict = []
+    for wd in merge_list:                     # w[0][0]------B---------C-------w[0][1]
+        a = []
+        flag = False
+        values = wd[1]
+        new_way = []
+
+        for i in range(len(values)):
+
+            if way_really_dict[values[i]].hascarema == True:
+                flag = True
+                index = i
+
+
+        if (flag == True):
+            count_create += 1
+
+
+            value=values[index]
+            way_node_B=way_map[value].ref[0]
+
+            way_node_C = way_map[value].ref[-1]
+            #print("kankanwo:",way_node_B,way_node_C,wd[0])
+            if(way_node_B in wd[0] and way_node_C in wd[0]):
+                print("hahha")
+                new_way.append(wd)
+                new_way_ret.extend(new_way)
+
+                continue
+
+
+            elif(way_node_B in wd[0]):
+                new_way.append([[way_node_B,way_node_C],[value]])
+
+                if way_node_B == wd[0][0]:
+                    #value_create=[]
+                    new_way.append([[ way_node_C,wd[0][1]], ['-99999'+str(count_create*2)]])
+                    item=way_class()
+                    item.ref=[way_node_C,wd[0][1]]
+                    item.id='-99999'+str(count_create*2)
+                    item.feature['length']=cal_distance.geodistance(node_gps_map[way_node_C][1],node_gps_map[way_node_C][0],node_gps_map[wd[0][1]][1],node_gps_map[wd[0][1]][0])
+
+                    new_dict.append(item)
+                    new_way_ret.extend(new_way)
+                else:
+                    new_way.append([[way_node_C, wd[0][0]], ['-99999' + str(count_create*2)]])
+
+                    item=way_class()
+                    item.ref=[way_node_C,wd[0][0]]
+                    item.id='-99999'+str(count_create*2)
+                    item.feature['length'] = cal_distance.geodistance(node_gps_map[way_node_C][1],
+                                                                      node_gps_map[way_node_C][0],
+                                                                      node_gps_map[wd[0][0]][1],
+                                                                      node_gps_map[wd[0][0]][0])
+
+                    new_dict.append(item)
+                    new_way_ret.extend(new_way)
+                continue
+
+            elif(way_node_C in wd[0]):
+                new_way.append([[way_node_B,way_node_C],[value]])
+
+                if way_node_C == wd[0][0]:
+                    #value_create=[]
+                    new_way.append([[ way_node_B,wd[0][1]], ['-99999'+str(count_create*2)]])
+
+
+                    item=way_class()
+                    item.ref=[way_node_B,wd[0][1]]
+                    item.id='-99999'+str(count_create*2)
+                    item.feature['length'] = cal_distance.geodistance(node_gps_map[way_node_B][1],
+                                                                      node_gps_map[way_node_B][0],
+                                                                      node_gps_map[wd[0][1]][1],
+                                                                      node_gps_map[wd[0][1]][0])
+
+                    new_dict.append(item)
+                    new_way_ret.extend(new_way)
+
+
+                else:
+                    new_way.append([[way_node_B, wd[0][0]], ['-99999' + str(count_create*2)]])
+
+                    item=way_class()
+                    item.ref=[way_node_B,wd[0][0]]
+                    item.id='-99999'+str(count_create*2)
+                    item.feature['length'] = cal_distance.geodistance(node_gps_map[way_node_B][1],
+                                                                      node_gps_map[way_node_B][0],
+                                                                      node_gps_map[wd[0][0]][1],
+                                                                      node_gps_map[wd[0][0]][0])
+
+                    new_dict.append(item)
+                    new_way_ret.extend(new_way)
+                continue
+
+            else:
+                new_way.append([[way_node_B, way_node_C], [value]])
+                dis1=cal_distance.geodistance(node_gps_map[way_node_B][1],node_gps_map[way_node_B][0],node_gps_map[wd[0][0]][1],node_gps_map[wd[0][0]][0])
+                dis2 = cal_distance.geodistance(node_gps_map[way_node_C][1], node_gps_map[way_node_C][0],
+                                                node_gps_map[wd[0][0]][1], node_gps_map[wd[0][0]][0])
+                if dis1<dis2:
+                    new_way.append([[way_node_B, wd[0][0]], ['-99999' + str(count_create*2)]])
+                    new_way.append([[way_node_C, wd[0][1]], ['-99999' + str(count_create*2+1)]])
+
+                    item=way_class()
+                    item.ref=[way_node_B,wd[0][0]]
+                    item.id='-99999'+str(count_create*2)
+                    item.feature['length'] = cal_distance.geodistance(node_gps_map[way_node_B][1],
+                                                                      node_gps_map[way_node_B][0],
+                                                                      node_gps_map[wd[0][0]][1],
+                                                                      node_gps_map[wd[0][0]][0])
+
+                    new_dict.append(item)
+
+                    item=way_class()
+                    item.ref=[way_node_C,wd[0][1]]
+                    item.id='-99999'+str(count_create*2+1)
+                    item.feature['length'] = cal_distance.geodistance(node_gps_map[way_node_C][1],
+                                                                      node_gps_map[way_node_C][0],
+                                                                      node_gps_map[wd[0][1]][1],
+                                                                      node_gps_map[wd[0][1]][0])
+
+                    new_dict.append(item)
+                    new_way_ret.extend(new_way)
+
+                else:
+                    print("check there!")
+                    new_way.append([[way_node_B, wd[0][1]], ['-99999' + str(count_create*2)]])
+                    new_way.append([[way_node_C, wd[0][0]], ['-99999' + str(count_create*2+1)]])
+
+                    item = way_class()
+                    item.ref = [way_node_B, wd[0][1]]
+                    item.id = '-99999' + str(count_create * 2)
+                    item.feature['length'] = cal_distance.geodistance(node_gps_map[way_node_B][1],
+                                                                      node_gps_map[way_node_B][0],
+                                                                      node_gps_map[wd[0][1]][1],
+                                                                      node_gps_map[wd[0][1]][0])
+
+                    new_dict.append(item)
+
+                    item = way_class()
+                    item.ref = [way_node_C, wd[0][0]]
+                    item.id = '-99999' + str(count_create * 2 + 1)
+                    item.feature['length'] = cal_distance.geodistance(node_gps_map[way_node_C][1],
+                                                                      node_gps_map[way_node_C][0],
+                                                                      node_gps_map[wd[0][0]][1],
+                                                                      node_gps_map[wd[0][0]][0])
+
+                    new_dict.append(item)
+                    new_way_ret.extend(new_way)
+
+
+
+            print(new_way)
+
+
+
+        else:
+
+            new_way_ret.append(wd)
+
+    print("*****************************************************")
+    print(len(a))
+
+    print("new way num:",len(new_way_ret))
+    print("old", len(merge_list))
+    print("count_create:", count_create)
+
+    #print(new_way_ret)
+
+    with open('./data/new_merged_way.json', 'w') as file_obj:
+        json.dump(new_way_ret, file_obj)
+
+    with open('./data/add_way_after_jieduan.dat', 'wb') as file_obj:
+        pickle.dump(new_dict, file_obj)
+
+
+
+if __name__ == '__main__':
+    camera_fix_way()
+    change_dict()
